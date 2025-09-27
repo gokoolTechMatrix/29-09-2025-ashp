@@ -113,7 +113,7 @@ export default function StaffVendorManagement() {
   }, []);
 
   const handleEmployeeClick = (employeeId: string) => {
-    router.push('/employee-details');
+    router.push(`/employee-details?id=${employeeId}`);
   };
 
   const handleVendorClick = (vendorId: string) => {

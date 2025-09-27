@@ -52,7 +52,7 @@ import {
   PiggyBank,
   Coffee
 } from "lucide-react";
-import { getEmployeeById, updateEmployeeDetails, updateUserInfo, getDepartments } from "@/lib/supabase";
+import { getEmployeeById, getEmployeeWithComputedFields, updateEmployeeDetails, updateUserInfo, getDepartments, calculateSalaryBreakdown, calculateAdvancedSalaryBreakdown, createSalaryStructure, getSalaryStructure, validateEmployeeCode } from "@/lib/supabase";
 
 export default function EmployeeDetailsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,26 +68,59 @@ export default function EmployeeDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [salaryBreakdown, setSalaryBreakdown] = useState<any>(null);
+  const [salaryStructure, setSalaryStructure] = useState<any>(null);
+  const [calculationMethod, setCalculationMethod] = useState<'monthly' | 'hourly'>('monthly');
   
   // Form state for editable fields
   const [formData, setFormData] = useState({
+    // Basic Info
     full_name: '',
     phone: '',
     email: '',
-    address: '',
+    employee_code: '',
+    
+    // Personal Details
+    gender: '',
+    date_of_birth: '',
+    nationality: 'Indian',
+    marital_status: '',
+    blood_group: '',
+    alternate_phone: '',
+    
+    // Address
+    current_address: '',
+    permanent_address: '',
+    
+    // Employment Details
     department_id: '',
-    employee_type: '',
-    date_of_joining: '',
+    position_id: '',
+    employment_type: '',
+    contract_type: '',
+    join_date: '',
+    
+    // Education & Experience
+    education_qualification: '',
+    experience_years: 0,
+    skills: [] as string[],
+    certifications: [] as string[],
+    
+    // Banking & Documents
+    bank_name: '',
+    bank_account_number: '',
+    ifsc_code: '',
+    pan_number: '',
+    aadhar_number: '',
+    
+    // Emergency Contact
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    
+    // Legacy fields for backward compatibility
     basic_salary: 0,
     hourly_rate: 0,
     salary_type: '',
-    bonus: 0,
-    bank_name: '',
-    account_number: '',
-    ifsc: '',
-    emergency_contact: '',
-    aadhaar: '',
-    pan: ''
+    bonus: 0
   });
   
   // Comprehensive salary calculation state
@@ -124,14 +157,53 @@ export default function EmployeeDetailsPage() {
     show: boolean;
     message: string;
     type: 'success' | 'error';
-  }>({ show: false, message: '', type: 'success' });
+  }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
   
   // Handle form data changes
-  const handleFormChange = (field: string, value: any) => {
+  const handleFormChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    
+    // Recalculate salary breakdown when salary-related fields change
+    if (['basic_salary', 'hourly_rate', 'salary_type'].includes(field)) {
+      const updatedFormData = { ...formData, [field]: value };
+      const breakdown = calculateSalaryBreakdown(
+        Number(updatedFormData.basic_salary) || 0,
+        Number(updatedFormData.hourly_rate) || hourlyRate,
+        8 * 26, // Default 8 hours * 26 days
+        (updatedFormData.salary_type as 'esi' | 'cash' | 'bank') || 'esi'
+      );
+      setSalaryBreakdown(breakdown);
+    }
+  };
+
+  // Helper function to sanitize data for database
+  const sanitizeForDatabase = (data: any) => {
+    const sanitized: any = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (value === '' || value === null || value === undefined) {
+        // For enum fields and dates, use null instead of empty string
+        if (['gender', 'marital_status', 'blood_group', 'employment_type', 'contract_type', 'date_of_birth', 'join_date'].includes(key)) {
+          sanitized[key] = null;
+        } else if (key === 'skills' || key === 'certifications') {
+          // For array fields, use empty array instead of null
+          sanitized[key] = [];
+        } else {
+          sanitized[key] = value === '' ? null : value;
+        }
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    
+    return sanitized;
   };
 
   // Save employee data
@@ -141,30 +213,50 @@ export default function EmployeeDetailsPage() {
     try {
       setSaving(true);
       
-      // Update user info
+      // Update user info - split full_name into first_name and last_name
+      const nameParts = formData.full_name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       await updateUserInfo(employeeData.id, {
-        full_name: formData.full_name,
+        first_name: firstName,
+        last_name: lastName,
         phone: formData.phone,
         email: formData.email
       });
       
-      // Update employee details
+      // Update employee details with sanitized data
       if (employeeData.employee_details?.[0]) {
-        await updateEmployeeDetails(employeeData.id, {
-          address: formData.address,
+        const employeeDetailsData = {
+          current_address: formData.current_address,
+          permanent_address: formData.permanent_address,
           department_id: formData.department_id,
-          employee_type: formData.employee_type,
-          date_of_joining: formData.date_of_joining,
-          basic_salary: formData.basic_salary,
-          hourly_rate: formData.hourly_rate,
-          salary_type: formData.salary_type,
+          position_id: formData.position_id,
+          employment_type: formData.employment_type,
+          contract_type: formData.contract_type,
+          join_date: formData.join_date,
+          employee_code: formData.employee_code,
+          gender: formData.gender,
+          date_of_birth: formData.date_of_birth,
+          nationality: formData.nationality,
+          marital_status: formData.marital_status,
+          blood_group: formData.blood_group,
+          alternate_phone: formData.alternate_phone,
+          education_qualification: formData.education_qualification,
+          experience_years: formData.experience_years,
+          skills: formData.skills,
+          certifications: formData.certifications,
           bank_name: formData.bank_name,
-          account_number: formData.account_number,
-          ifsc: formData.ifsc,
-          emergency_contact: formData.emergency_contact,
-          aadhaar: formData.aadhaar,
-          pan: formData.pan
-        });
+          bank_account_number: formData.bank_account_number,
+          ifsc_code: formData.ifsc_code,
+          emergency_contact_name: formData.emergency_contact_name,
+          emergency_contact_phone: formData.emergency_contact_phone,
+          aadhar_number: formData.aadhar_number,
+          pan_number: formData.pan_number
+        };
+        
+        const sanitizedData = sanitizeForDatabase(employeeDetailsData);
+        await updateEmployeeDetails(employeeData.id, sanitizedData);
       }
       
       // Reload data to reflect changes
@@ -199,7 +291,7 @@ export default function EmployeeDetailsPage() {
         }
         
         const [employeeResult, departmentsData] = await Promise.all([
-          getEmployeeById(employeeId),
+          getEmployeeWithComputedFields(employeeId),
           getDepartments()
         ]);
         
@@ -209,29 +301,73 @@ export default function EmployeeDetailsPage() {
           // Set initial form values from database
           if (employeeResult.employee_details?.[0]) {
             const details = employeeResult.employee_details[0];
-            setHourlyRate(details.hourly_rate || 300);
-            setContractType(details.contract_type || "hourly");
-            setSalaryType(details.salary_type || "esi");
+            const hourlyRateValue = details.hourly_rate || 300;
+            const contractTypeValue = details.contract_type || "hourly";
+            const salaryTypeValue = details.salary_type || "esi";
+            const basicSalaryValue = details.basic_salary || 0;
             
-            // Set form data
+            setHourlyRate(hourlyRateValue);
+            setContractType(contractTypeValue);
+            setSalaryType(salaryTypeValue);
+            
+            // Calculate salary breakdown
+            const breakdown = calculateSalaryBreakdown(
+              basicSalaryValue,
+              hourlyRateValue,
+              8 * 26, // Default 8 hours * 26 days
+              salaryTypeValue as 'esi' | 'cash' | 'bank'
+            );
+            setSalaryBreakdown(breakdown);
+            
+            // Set form data with proper fallbacks
             setFormData({
-              full_name: employeeResult.full_name || '',
+              // Basic Info
+              full_name: employeeResult.computed?.fullName || `${employeeResult.first_name || ''} ${employeeResult.last_name || ''}`.trim(),
               phone: employeeResult.phone || '',
               email: employeeResult.email || '',
-              address: employeeResult.address || '',
+              employee_code: details.employee_code || '',
+              
+              // Personal Details
+              gender: details.gender || '',
+              date_of_birth: details.date_of_birth || '',
+              nationality: details.nationality || 'Indian',
+              marital_status: details.marital_status || '',
+              blood_group: details.blood_group || '',
+              alternate_phone: details.alternate_phone || '',
+              
+              // Address
+              current_address: details.current_address || details.address || '',
+              permanent_address: details.permanent_address || '',
+              
+              // Employment Details
               department_id: details.department_id || '',
-              employee_type: details.employee_type || '',
-              date_of_joining: details.date_of_joining || '',
-              basic_salary: details.basic_salary || 0,
-              hourly_rate: details.hourly_rate || 0,
-              salary_type: details.salary_type || '',
-              bonus: details.bonus || 0,
+              position_id: details.position_id || '',
+              employment_type: details.employment_type || '',
+              contract_type: details.contract_type || '',
+              join_date: details.join_date || '',
+              
+              // Education & Experience
+              education_qualification: details.education_qualification || '',
+              experience_years: details.experience_years || 0,
+              skills: details.skills || [],
+              certifications: details.certifications || [],
+              
+              // Banking & Documents
               bank_name: details.bank_name || '',
-              account_number: details.account_number || '',
-              ifsc: details.ifsc || '',
-              emergency_contact: details.emergency_contact || '',
-              aadhaar: details.aadhaar || '',
-              pan: details.pan || ''
+              bank_account_number: details.bank_account_number || '',
+              ifsc_code: details.ifsc_code || '',
+              pan_number: details.pan_number || '',
+              aadhar_number: details.aadhar_number || '',
+              
+              // Emergency Contact
+              emergency_contact_name: details.emergency_contact_name || '',
+              emergency_contact_phone: details.emergency_contact_phone || '',
+              
+              // Legacy fields for backward compatibility
+              basic_salary: basicSalaryValue,
+              hourly_rate: hourlyRateValue,
+              salary_type: salaryTypeValue,
+              bonus: details.bonus || 0
             });
           }
         }
@@ -569,7 +705,7 @@ export default function EmployeeDetailsPage() {
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Employee Details</h1>
                 <p className="text-sm text-slate-500">
-                  {loading ? "Loading..." : employeeData ? `${employeeData.full_name} • ${employeeData.employee_details?.[0]?.position?.name || 'N/A'}` : "Employee not found"}
+                  {loading ? "Loading..." : employeeData ? `${employeeData.first_name || ''} ${employeeData.last_name || ''} • ${employeeData.employee_details?.[0]?.position?.name || 'N/A'}`.trim() : "Employee not found"}
                 </p>
               </div>
             </div>
@@ -644,18 +780,18 @@ export default function EmployeeDetailsPage() {
                   <Avatar className="h-16 w-16 border-2 border-white shadow-lg">
                     <AvatarImage src={employeeData?.avatar_url} />
                     <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-semibold">
-                      {loading ? "..." : employeeData?.full_name?.split(" ").map((n: string)=>n[0]).join("") || "N/A"}
+                      {loading ? "..." : `${employeeData?.first_name?.[0] || ''}${employeeData?.last_name?.[0] || ''}` || "N/A"}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">
-                      {loading ? "Loading..." : employeeData?.full_name || "N/A"}
+                      {loading ? "Loading..." : employeeData?.computed?.fullName || `${employeeData?.first_name || ''} ${employeeData?.last_name || ''}`.trim() || "N/A"}
                     </h3>
                     <p className="text-sm text-slate-600">
-                      {loading ? "Loading..." : employeeData?.employee_details?.[0]?.position?.name || "N/A"}
+                      {loading ? "Loading..." : employeeData?.computed?.positionTitle || employeeData?.employee_details?.[0]?.positions?.title || "N/A"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {loading ? "Loading..." : employeeData?.id || "N/A"}
+                      {loading ? "Loading..." : `ID: ${employeeData?.employee_id || employeeData?.id || 'N/A'}`}
                     </p>
                   </div>
                 </div>
@@ -663,13 +799,13 @@ export default function EmployeeDetailsPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Department</span>
                     <span className="text-slate-900 font-medium">
-                      {loading ? "Loading..." : employeeData?.employee_details?.[0]?.department?.name || "N/A"}
+                      {loading ? "Loading..." : employeeData?.computed?.departmentName || employeeData?.employee_details?.[0]?.departments?.name || "N/A"}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Type</span>
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      {loading ? "Loading..." : employeeData?.employee_details?.[0]?.employee_type || "N/A"}
+                      {loading ? "Loading..." : employeeData?.employee_details?.[0]?.employee_type || employeeData?.employee_details?.[0]?.contract_type || "N/A"}
                     </Badge>
                   </div>
                 </div>
@@ -686,7 +822,7 @@ export default function EmployeeDetailsPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-slate-900">
-                      {loading ? "Loading..." : employeeData?.employee_details?.[0]?.basic_salary ? `₹${employeeData.employee_details[0].basic_salary}` : "N/A"}
+                      {loading ? "Loading..." : salaryBreakdown?.grossSalary ? `₹${salaryBreakdown.grossSalary.toLocaleString()}` : employeeData?.employee_details?.[0]?.basic_salary ? `₹${employeeData.employee_details[0].basic_salary.toLocaleString()}` : "N/A"}
                     </p>
                     <p className="text-sm text-slate-500">Monthly</p>
                   </div>
@@ -695,13 +831,13 @@ export default function EmployeeDetailsPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Salary Type</span>
                       <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                        {loading ? "Loading..." : employeeData?.employee_details?.[0]?.salary_type || "N/A"}
+                        {loading ? "Loading..." : (employeeData?.employee_details?.[0]?.salary_type || 'N/A').toUpperCase()}
                       </Badge>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Rate/Hour</span>
                       <span className="text-purple-600 font-medium">
-                        {loading ? "Loading..." : employeeData?.employee_details?.[0]?.hourly_rate ? `₹${employeeData.employee_details[0].hourly_rate}` : "N/A"}
+                        {loading ? "Loading..." : employeeData?.employee_details?.[0]?.hourly_rate ? `₹${employeeData.employee_details[0].hourly_rate.toLocaleString()}` : "N/A"}
                       </span>
                     </div>
                   </div>
@@ -718,8 +854,10 @@ export default function EmployeeDetailsPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-slate-900">
-                      {employeeData?.employee_details?.[0]?.date_of_joining 
-                        ? calculateDaysWorked(employeeData.employee_details[0].date_of_joining).toLocaleString()
+                      {employeeData?.computed?.daysWorked 
+                        ? employeeData.computed.daysWorked.toLocaleString()
+                        : employeeData?.employee_details?.[0]?.join_date 
+                        ? calculateDaysWorked(employeeData.employee_details[0].join_date).toLocaleString()
                         : "N/A"
                       }
                     </p>
@@ -730,25 +868,24 @@ export default function EmployeeDetailsPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Status</span>
                     <Badge className="bg-green-100 text-green-800 border-green-200">
-                      {employeeData?.status || "Active"}
+                      {(employeeData?.status || "active").charAt(0).toUpperCase() + (employeeData?.status || "active").slice(1)}
                     </Badge>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Since Joining</span>
                     <span className="text-slate-900 font-medium">
-                      {employeeData?.employee_details?.[0]?.date_of_joining || "N/A"}
+                      {employeeData?.employee_details?.[0]?.join_date || employeeData?.employee_details?.[0]?.date_of_joining || "N/A"}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          )
-          }
+          )}
 
           {/* Detailed Information Tabs */}
           {!loading && !error && employeeData && (
-          <div className="relative group">
+            <div className="relative group">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
             <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-200/50 border border-white/20">
               <Tabs defaultValue="details" className="w-full">
@@ -788,7 +925,7 @@ export default function EmployeeDetailsPage() {
                             <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
                               <AvatarImage src={employeeData?.avatar_url} />
                               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-bold">
-                                {loading ? "..." : employeeData?.full_name?.split(" ").map((n: string)=>n[0]).join("") || "N/A"}
+                                {loading ? "..." : `${employeeData?.first_name?.[0] || ''}${employeeData?.last_name?.[0] || ''}` || "N/A"}
                               </AvatarFallback>
                             </Avatar>
                             <Button variant="outline" className="bg-white/80 backdrop-blur-sm border-slate-200/50">
@@ -814,18 +951,20 @@ export default function EmployeeDetailsPage() {
                                 <Label htmlFor="name" className="text-sm font-medium text-slate-700">Full Name</Label>
                                 <Input
                                   id="name"
-                                  value={employeeData?.first_name && employeeData?.last_name ? `${employeeData.first_name} ${employeeData.last_name}` : formData.full_name}
+                                  value={formData.full_name}
                                   onChange={(e) => handleFormChange('full_name', e.target.value)}
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
+                                  placeholder="Enter full name"
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="empId" className="text-sm font-medium text-slate-700">Employee ID</Label>
+                                <Label htmlFor="employee_code" className="text-sm font-medium text-slate-700">Employee Code</Label>
                                 <Input
-                                  id="empId"
-                                  value={employeeData?.employee_id || ''}
-                                  disabled
-                                  className="bg-slate-100/80 backdrop-blur-sm border-slate-200/50"
+                                  id="employee_code"
+                                  value={formData.employee_code}
+                                  onChange={(e) => handleFormChange('employee_code', e.target.value)}
+                                  className="bg-white/80 backdrop-blur-sm border-slate-200/50"
+                                  placeholder="Enter employee code"
                                 />
                               </div>
                               <div className="space-y-2">
@@ -852,8 +991,8 @@ export default function EmployeeDetailsPage() {
                                 <Input
                                   id="dateOfBirth"
                                   type="date"
-                                  value={employeeData?.employee_details?.[0]?.date_of_birth || ''}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('date_of_birth', e.target.value)}
+                                  value={formData.date_of_birth}
+                                  onChange={(e) => handleFormChange('date_of_birth', e.target.value)}
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
                                 />
                               </div>
@@ -861,8 +1000,8 @@ export default function EmployeeDetailsPage() {
                                 <Label htmlFor="gender" className="text-sm font-medium text-slate-700">Gender</Label>
                                 <select
                                   id="gender"
-                                  value={employeeData?.employee_details?.[0]?.gender || ''}
-                                  onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFormChange('gender', e.target.value)}
+                                  value={formData.gender}
+                                  onChange={(e) => handleFormChange('gender', e.target.value)}
                                   className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                   <option value="">Select Gender</option>
@@ -924,11 +1063,11 @@ export default function EmployeeDetailsPage() {
                                 />
                               </div>
                               <div className="space-y-2 md:col-span-2">
-                                <Label htmlFor="address" className="text-sm font-medium text-slate-700">Address</Label>
+                                <Label htmlFor="current_address" className="text-sm font-medium text-slate-700">Current Address</Label>
                                 <Input
-                                  id="address"
-                                  value={formData.address}
-                                  onChange={(e) => handleFormChange('address', e.target.value)}
+                                  id="current_address"
+                                  value={formData.current_address}
+                                  onChange={(e) => handleFormChange('current_address', e.target.value)}
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
                                 />
                               </div>
@@ -975,8 +1114,8 @@ export default function EmployeeDetailsPage() {
                                 <select
                                   id="type"
                                   className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-                                  value={formData.employee_type}
-                                  onChange={(e) => handleFormChange('employee_type', e.target.value)}
+                                  value={formData.employment_type}
+                                  onChange={(e) => handleFormChange('employment_type', e.target.value)}
                                 >
                                   <option value="">Select Type</option>
                                   <option value="full_time">Full Time</option>
@@ -1005,8 +1144,8 @@ export default function EmployeeDetailsPage() {
                                 <Input
                                   id="doj"
                                   type="date"
-                                  value={formData.date_of_joining}
-                                  onChange={(e) => handleFormChange('date_of_joining', e.target.value)}
+                                  value={formData.join_date}
+                                  onChange={(e) => handleFormChange('join_date', e.target.value)}
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
                                 />
                               </div>
@@ -1354,1298 +1493,220 @@ export default function EmployeeDetailsPage() {
                   </div>
                 </TabsContent>
 
-                {/* Salary Tab - Comprehensive Salary Sheet */}
+                {/* Simplified Salary Tab - Monthly & Hourly Only */}
                 <TabsContent value="salary" className="p-6">
                   <div className="space-y-8">
-                    {/* Salary Sheet Header */}
+                    {/* Salary Configuration Header */}
                     <div className="text-center mb-8">
                       <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                        Employee Salary Sheet
+                        Salary Configuration
                       </h2>
-                      <p className="text-slate-600 mt-2">Comprehensive salary calculation and breakdown</p>
+                      <p className="text-slate-600 mt-2">Configure employee salary structure and calculations</p>
                     </div>
 
-                    {/* Basic Salary Information */}
-                    <Section title="Basic Salary Information" icon={Calculator}>
-                      <div className="relative group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
-                        <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            {/* Rate per hour */}
-                            <div className="space-y-3">
-                              <label className="block text-sm font-medium text-slate-700">Rate per Hour (₹)</label>
-                              <div className="relative">
-                                <input 
-                                  type="number" 
-                                  value={hourlyRate}
-                                  onChange={(e) => setHourlyRate(Number(e.target.value) || 0)}
-                                  className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
-                                />
-                                <span className="absolute right-3 top-3 text-slate-500">₹/hr</span>
-                              </div>
+                    {/* Calculation Method Selection */}
+                    <div className="relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-400/20 to-indigo-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
+                      <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
+                        <h3 className="text-xl font-semibold text-slate-700 mb-6 flex items-center">
+                          <Calculator className="h-6 w-6 mr-3 text-purple-600" />
+                          Salary Calculation Method
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                          <div
+                            onClick={() => setCalculationMethod('monthly')}
+                            className={`cursor-pointer p-6 rounded-xl border-2 transition-all duration-300 ${
+                              calculationMethod === 'monthly'
+                                ? 'border-purple-500 bg-purple-50 shadow-lg'
+                                : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-25'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <div className="text-3xl mb-3">📅</div>
+                              <div className="font-semibold text-slate-700 text-lg">Monthly Salary</div>
+                              <div className="text-sm text-slate-500 mt-2">Fixed monthly amount with allowances</div>
                             </div>
-
-                            {/* Total Hours */}
-                            <div className="space-y-3">
-                              <label className="block text-sm font-medium text-slate-700">Total Hours</label>
-                              <div className="relative">
-                                <input 
-                                  type="number" 
-                                  value={attendanceStats.totalHours}
-                                  readOnly
-                                  className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg bg-green-50"
-                                />
-                                <span className="absolute right-3 top-3 text-slate-500">hrs</span>
-                              </div>
-                              <p className="text-xs text-slate-500">Auto-calculated from attendance</p>
-                            </div>
-
-                            {/* Basic Salary */}
-                            <div className="space-y-3">
-                              <label className="block text-sm font-medium text-slate-700">Basic Salary</label>
-                              <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg">
-                                <div className="text-xl font-bold">₹{(hourlyRate * attendanceStats.totalHours).toLocaleString()}</div>
-                                <div className="text-sm opacity-90">{hourlyRate} × {attendanceStats.totalHours}</div>
-                              </div>
-                            </div>
-
-                            {/* Contract Type */}
-                            <div className="space-y-3">
-                              <label className="block text-sm font-medium text-slate-700">Contract Type</label>
-                              <select 
-                                value={contractType}
-                                onChange={(e) => setContractType(e.target.value)}
-                                className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
-                              >
-                                <option value="hourly">Hourly</option>
-                                <option value="monthly">Monthly</option>
-                                <option value="contract">Contract</option>
-                              </select>
+                          </div>
+                          
+                          <div
+                            onClick={() => setCalculationMethod('hourly')}
+                            className={`cursor-pointer p-6 rounded-xl border-2 transition-all duration-300 ${
+                              calculationMethod === 'hourly'
+                                ? 'border-purple-500 bg-purple-50 shadow-lg'
+                                : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-25'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <div className="text-3xl mb-3">⏰</div>
+                              <div className="font-semibold text-slate-700 text-lg">Hourly Rate</div>
+                              <div className="text-sm text-slate-500 mt-2">Pay per hour with overtime support</div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </Section>
+                    </div>
 
-                    {/* Gross Salary & ESI/TDS */}
-                    <Section title="Gross Salary & Deductions" icon={Receipt}>
-                      <div className="relative group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
-                        <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Left Column */}
-                            <div className="space-y-6">
-                              {/* Gross Salary */}
-                              <div className="space-y-3">
-                                <label className="block text-sm font-medium text-slate-700">Gross Salary (₹)</label>
-                                <div className="relative">
-                                  <input 
-                                    type="number" 
-                                    value={grossSalary || (hourlyRate * attendanceStats.totalHours)}
-                                    onChange={(e) => setGrossSalary(Number(e.target.value) || 0)}
-                                    className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-emerald-50"
-                                  />
-                                  <span className="absolute right-3 top-3 text-slate-500">₹</span>
-                                </div>
-                              </div>
+                    {/* Dynamic Salary Fields */}
+                    <div className="relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
+                      <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
+                        <h3 className="text-xl font-semibold text-slate-700 mb-6 flex items-center">
+                          <DollarSign className="h-6 w-6 mr-3 text-emerald-600" />
+                          Salary Components
+                        </h3>
 
-                              {/* Salary Type Selection */}
-                              <div className="space-y-3">
-                                <label className="block text-sm font-medium text-slate-700">Salary Type</label>
-                                <div className="flex space-x-4">
-                                  <label className="flex items-center space-x-2">
-                                    <input 
-                                      type="radio" 
-                                      value="esi" 
-                                      checked={salaryType === "esi"}
-                                      onChange={(e) => setSalaryType(e.target.value as "esi" | "cash")}
-                                      className="text-blue-600"
-                                    />
-                                    <span>ESI</span>
-                                  </label>
-                                  <label className="flex items-center space-x-2">
-                                    <input 
-                                      type="radio" 
-                                      value="cash" 
-                                      checked={salaryType === "cash"}
-                                      onChange={(e) => setSalaryType(e.target.value as "esi" | "cash")}
-                                      className="text-blue-600"
-                                    />
-                                    <span>Cash</span>
-                                  </label>
-                                </div>
-                              </div>
+                        {/* Monthly Salary Fields */}
+                        {calculationMethod === 'monthly' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <Label htmlFor="basic_salary">Basic Salary (₹)</Label>
+                              <Input
+                                id="basic_salary"
+                                type="number"
+                                value={formData.basic_salary}
+                                onChange={(e) => handleFormChange('basic_salary', Number(e.target.value))}
+                                className="text-lg font-semibold"
+                                placeholder="Enter basic salary"
+                              />
                             </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="working_days">Working Days per Month</Label>
+                              <Input
+                                id="working_days"
+                                type="number"
+                                value={26}
+                                readOnly
+                                className="bg-slate-100"
+                                placeholder="26"
+                              />
+                            </div>
+                          </div>
+                        )}
 
-                            {/* Right Column */}
-                            <div className="space-y-6">
-                              {/* ESI/TDS Amount */}
-                              <div className="space-y-3">
-                                <label className="block text-sm font-medium text-slate-700">ESI/TDS Amount (₹)</label>
-                                <div className="relative">
-                                  <input 
-                                    type="number" 
-                                    value={esiTdsAmount}
-                                    onChange={(e) => setEsiTdsAmount(Number(e.target.value) || 0)}
-                                    className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-orange-50"
-                                  />
-                                  <span className="absolute right-3 top-3 text-slate-500">₹</span>
-                                </div>
-                              </div>
+                        {/* Hourly Rate Fields */}
+                        {calculationMethod === 'hourly' && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-2">
+                              <Label htmlFor="hourly_rate">Hourly Rate (₹)</Label>
+                              <Input
+                                id="hourly_rate"
+                                type="number"
+                                value={formData.hourly_rate}
+                                onChange={(e) => handleFormChange('hourly_rate', Number(e.target.value))}
+                                className="text-lg font-semibold"
+                                placeholder="Enter hourly rate"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="standard_hours">Standard Hours/Day</Label>
+                              <Input
+                                id="standard_hours"
+                                type="number"
+                                step="0.5"
+                                value={8}
+                                readOnly
+                                className="bg-slate-100"
+                                placeholder="8.0"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="total_hours">Total Hours This Month</Label>
+                              <Input
+                                id="total_hours"
+                                type="number"
+                                value={attendanceStats.totalHours}
+                                readOnly
+                                className="bg-green-50 font-semibold"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                              {/* ESI Cash Amount (conditional) */}
-                              {salaryType === "esi" && (
-                                <div className="space-y-3">
-                                  <label className="block text-sm font-medium text-slate-700">ESI Cash Amount (₹)</label>
-                                  <div className="relative">
-                                    <input 
-                                      type="number" 
-                                      value={esiCashAmount}
-                                      onChange={(e) => setEsiCashAmount(Number(e.target.value) || 0)}
-                                      className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-purple-50"
-                                    />
-                                    <span className="absolute right-3 top-3 text-slate-500">₹</span>
-                                  </div>
-                                  <div className="p-3 bg-purple-100 rounded-lg">
-                                    <p className="text-sm text-purple-700">
-                                      Remaining Salary: ₹{((grossSalary || (hourlyRate * attendanceStats.totalHours)) - esiTdsAmount - esiCashAmount).toLocaleString()}
-                                    </p>
-                                  </div>
+                    {/* Salary Preview */}
+                    <div className="relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
+                      <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
+                        <h3 className="text-xl font-semibold text-slate-700 mb-6 flex items-center">
+                          <Receipt className="h-6 w-6 mr-3 text-blue-600" />
+                          Salary Preview
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {/* Earnings */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-emerald-700 text-lg">Earnings</h4>
+                            <div className="space-y-3">
+                              {calculationMethod === 'monthly' && (
+                                <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                                  <span>Basic Salary:</span>
+                                  <span className="font-semibold text-emerald-600">₹{(formData.basic_salary || 0).toLocaleString()}</span>
                                 </div>
+                              )}
+                              {calculationMethod === 'hourly' && (
+                                <>
+                                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                                    <span>Hourly Rate:</span>
+                                    <span className="font-semibold">₹{formData.hourly_rate}/hr</span>
+                                  </div>
+                                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                                    <span>Total Hours:</span>
+                                    <span className="font-semibold">{attendanceStats.totalHours} hrs</span>
+                                  </div>
+                                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                                    <span>Gross Earnings:</span>
+                                    <span className="font-semibold text-emerald-600">₹{((formData.hourly_rate || 0) * attendanceStats.totalHours).toLocaleString()}</span>
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    </Section>
 
-                    {/* Additional Deductions */}
-                    <Section title="Additional Deductions" icon={Wallet}>
-                      <div className="relative group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400/20 to-red-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
-                        <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Canteen */}
-                            <div className="space-y-3">
-                              <label className="block text-sm font-medium text-slate-700 flex items-center">
-                                <Coffee className="h-4 w-4 mr-2" />
-                                Canteen Amount (₹)
-                              </label>
-                              <div className="relative">
-                                <input 
-                                  type="number" 
-                                  value={canteenAmount}
-                                  onChange={(e) => setCanteenAmount(Number(e.target.value) || 0)}
-                                  className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-orange-50"
-                                />
-                                <span className="absolute right-3 top-3 text-slate-500">₹</span>
-                              </div>
-                            </div>
-
-                            {/* Advance Amount */}
-                            <div className="space-y-3">
-                              <label className="block text-sm font-medium text-slate-700 flex items-center">
-                                <PiggyBank className="h-4 w-4 mr-2" />
-                                Advance Amount (₹)
-                              </label>
-                              <div className="relative">
-                                <input 
-                                  type="number" 
-                                  value={advanceAmount}
-                                  onChange={(e) => setAdvanceAmount(Number(e.target.value) || 0)}
-                                  className="w-full px-4 py-3 text-lg font-semibold border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-red-50"
-                                />
-                                <span className="absolute right-3 top-3 text-slate-500">₹</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Section>
-
-                    {/* Multiple Fines Section */}
-                    <Section title="Fines & Penalties" icon={XCircle}>
-                      <div className="relative group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-red-400/20 to-pink-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
-                        <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
-                          {/* Add Fine Button */}
-                          <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-semibold text-slate-700">Fine Details</h3>
-                            <Button 
-                              onClick={() => {
-                                const newFine = {
-                                  id: Date.now().toString(),
-                                  amount: 0,
-                                  reason: "",
-                                  description: ""
-                                };
-                                setFines([...fines, newFine]);
-                              }}
-                              size="sm" 
-                              className="bg-gradient-to-r from-red-500 to-pink-500"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Fine
-                            </Button>
-                          </div>
-
-                          {/* Fines List */}
+                          {/* Summary */}
                           <div className="space-y-4">
-                            {fines.map((fine, index) => (
-                              <div key={fine.id} className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Amount (₹)</label>
-                                    <input 
-                                      type="number" 
-                                      value={fine.amount}
-                                      onChange={(e) => {
-                                        const updatedFines = [...fines];
-                                        updatedFines[index].amount = Number(e.target.value) || 0;
-                                        setFines(updatedFines);
-                                      }}
-                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Reason</label>
-                                    <select 
-                                      value={fine.reason}
-                                      onChange={(e) => {
-                                        const updatedFines = [...fines];
-                                        updatedFines[index].reason = e.target.value;
-                                        setFines(updatedFines);
-                                      }}
-                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                                    >
-                                      <option value="">Select reason</option>
-                                      <option value="late-arrival">Late Arrival</option>
-                                      <option value="early-departure">Early Departure</option>
-                                      <option value="absence">Unexcused Absence</option>
-                                      <option value="misconduct">Misconduct</option>
-                                      <option value="other">Other</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
-                                    <input 
-                                      type="text" 
-                                      value={fine.description}
-                                      onChange={(e) => {
-                                        const updatedFines = [...fines];
-                                        updatedFines[index].description = e.target.value;
-                                        setFines(updatedFines);
-                                      }}
-                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                                      placeholder="Optional description"
-                                    />
-                                  </div>
-                                  <div className="flex items-end">
-                                    <Button 
-                                      onClick={() => {
-                                        const updatedFines = fines.filter((_, i) => i !== index);
-                                        setFines(updatedFines);
-                                      }}
-                                      variant="outline" 
-                                      size="sm" 
-                                      className="text-red-600 border-red-300 hover:bg-red-50"
-                                    >
-                                      <Minus className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
+                            <h4 className="font-semibold text-blue-700 text-lg">Summary</h4>
+                            <div className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">
+                              <div className="text-sm opacity-90 mb-2">
+                                {calculationMethod === 'monthly' ? 'Monthly Salary' : 'Total Earnings'}
                               </div>
-                            ))}
-
-                            {fines.length === 0 && (
-                              <div className="text-center py-8 text-slate-500">
-                                <XCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                                <p>No fines added yet. Click "Add Fine" to add penalties.</p>
+                              <div className="text-3xl font-bold">
+                                ₹{calculationMethod === 'monthly' 
+                                  ? (formData.basic_salary || 0).toLocaleString()
+                                  : ((formData.hourly_rate || 0) * attendanceStats.totalHours).toLocaleString()
+                                }
                               </div>
-                            )}
-                          </div>
-
-                          {/* Total Fines */}
-                          {fines.length > 0 && (
-                            <div className="mt-6 p-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-lg border border-red-200">
-                              <div className="flex justify-between items-center">
-                                <span className="text-slate-700 font-medium">Total Fines:</span>
-                                <span className="text-red-700 font-bold text-lg">
-                                  ₹{fines.reduce((sum, fine) => sum + fine.amount, 0).toLocaleString()}
-                                </span>
+                              <div className="text-sm opacity-90 mt-2">
+                                {calculationMethod === 'monthly' 
+                                  ? 'Fixed monthly amount'
+                                  : `${formData.hourly_rate || 0} × ${attendanceStats.totalHours} hours`
+                                }
                               </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </Section>
-
-                    {/* Net Salary Summary */}
-                    <Section title="Net Salary Summary" icon={DollarSign}>
-                      <div className="relative group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
-                        <div className="relative bg-white/90 backdrop-blur-2xl shadow-xl shadow-slate-900/5 border border-white/20 rounded-xl p-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Calculation Breakdown */}
-                            <div className="space-y-4">
-                              <h3 className="text-lg font-semibold text-slate-700 mb-4">Calculation Breakdown</h3>
-                              <div className="space-y-3">
-                                <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                                  <span className="text-slate-600">Gross Salary:</span>
-                                  <span className="font-semibold text-emerald-600">
-                                    ₹{(grossSalary || (hourlyRate * attendanceStats.totalHours)).toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                                  <span className="text-slate-600">ESI/TDS:</span>
-                                  <span className="font-semibold text-red-600">-₹{esiTdsAmount.toLocaleString()}</span>
-                                </div>
-                                {salaryType === "esi" && (
-                                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                                    <span className="text-slate-600">ESI Cash:</span>
-                                    <span className="font-semibold text-red-600">-₹{esiCashAmount.toLocaleString()}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                                  <span className="text-slate-600">Canteen:</span>
-                                  <span className="font-semibold text-red-600">-₹{canteenAmount.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                                  <span className="text-slate-600">Advance:</span>
-                                  <span className="font-semibold text-red-600">-₹{advanceAmount.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                                  <span className="text-slate-600">Total Fines:</span>
-                                  <span className="font-semibold text-red-600">
-                                    -₹{fines.reduce((sum, fine) => sum + fine.amount, 0).toLocaleString()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Net Salary Display */}
-                            <div className="flex flex-col justify-center items-center">
-                              <div className="text-center">
-                                <h3 className="text-2xl font-bold text-slate-700 mb-4">Net Salary</h3>
-                                <div className="p-8 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-2xl shadow-2xl">
-                                  <div className="text-4xl font-bold mb-2">
-                                    ₹{(
-                                      (grossSalary || (hourlyRate * attendanceStats.totalHours)) - 
-                                      esiTdsAmount - 
-                                      (salaryType === "esi" ? esiCashAmount : 0) - 
-                                      canteenAmount - 
-                                      advanceAmount - 
-                                      fines.reduce((sum, fine) => sum + fine.amount, 0)
-                                    ).toLocaleString()}
-                                  </div>
-                                  <div className="text-sm opacity-90">Final Amount Payable</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="mt-8 flex justify-end space-x-3">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setNotification({
-                                  show: true,
-                                  message: 'Salary sheet recalculated successfully!',
-                                  type: 'success'
-                                });
-                                setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 3000);
-                              }}
-                            >
-                              <Calculator className="h-4 w-4 mr-2" />
-                              Recalculate
-                            </Button>
-                            <Button size="sm" className="bg-gradient-to-r from-emerald-600 to-green-600">
-                              <Save className="h-4 w-4 mr-2" />
-                              Save Salary Sheet
-                            </Button>
-                            <Button size="sm" variant="outline" className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0">
-                              <Download className="h-4 w-4 mr-2" />
-                              Download PDF
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Section>
-                  </div>
-                </TabsContent>
-
-                {/* Contract & Contact Tab */}
-                <TabsContent value="contract" className="p-6">
-                  <div className="space-y-6">
-                    {/* Contract Management Section */}
-                    <Section title="Contract Management" icon={Briefcase}>
-                      <div className="space-y-6">
-                        {/* Add New Contract */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200/50">
-                          <h4 className="text-lg font-semibold text-slate-900 mb-4">Add New Contract</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Contract Title</label>
-                              <input 
-                                type="text" 
-                                placeholder="Enter contract title"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Contract Type</label>
-                              <select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">Select type</option>
-                                <option value="hourly">Hourly Rate</option>
-                                <option value="fixed">Fixed Price</option>
-                                <option value="milestone">Milestone Based</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Rate/Amount (₹)</label>
-                              <input 
-                                type="number" 
-                                placeholder="Enter rate or amount"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
-                              <input 
-                                type="date" 
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">End Date</label>
-                              <input 
-                                type="date" 
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            <div className="flex items-end">
-                              <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                                Add Contract
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="mt-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
-                            <textarea 
-                              placeholder="Enter contract description and terms"
-                              rows={3}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Active Contracts */}
-                        <div className="space-y-4">
-                          <h4 className="text-lg font-semibold text-slate-900">Active Contracts</h4>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200/50">
-                              <div className="flex justify-between items-start mb-3">
-                                <div>
-                                  <h5 className="font-semibold text-slate-900">Quality Control Audit</h5>
-                                  <p className="text-sm text-slate-600">Hourly Rate Contract</p>
-                                </div>
-                                <Badge className="bg-green-100 text-green-800">Active</Badge>
-                              </div>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Rate:</span>
-                                  <span className="font-medium">₹500/hour</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Duration:</span>
-                                  <span className="font-medium">Jan 1 - Mar 31, 2024</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Hours This Month:</span>
-                                  <span className="font-medium text-green-700">30 hrs</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Earnings:</span>
-                                  <span className="font-semibold text-green-700">₹15,000</span>
-                                </div>
-                              </div>
-                              <div className="mt-3 flex space-x-2">
-                                <Button size="sm" variant="outline" className="flex-1">Edit</Button>
-                                <Button size="sm" variant="outline" className="flex-1">View Details</Button>
-                              </div>
-                            </div>
-
-                            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200/50">
-                              <div className="flex justify-between items-start mb-3">
-                                <div>
-                                  <h5 className="font-semibold text-slate-900">Process Optimization</h5>
-                                  <p className="text-sm text-slate-600">Fixed Price Contract</p>
-                                </div>
-                                <Badge className="bg-blue-100 text-blue-800">Active</Badge>
-                              </div>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Amount:</span>
-                                  <span className="font-medium">₹25,000</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Duration:</span>
-                                  <span className="font-medium">Jan 15 - Feb 15, 2024</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Progress:</span>
-                                  <span className="font-medium text-blue-700">75%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Paid:</span>
-                                  <span className="font-semibold text-blue-700">₹18,750</span>
-                                </div>
-                              </div>
-                              <div className="mt-3 flex space-x-2">
-                                <Button size="sm" variant="outline" className="flex-1">Edit</Button>
-                                <Button size="sm" variant="outline" className="flex-1">View Details</Button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Section>
-
-
-                    
-                    {/* Work History & Project Tracking */}
-                    <Section title="Work History & Project Tracking" icon={CalendarIcon}>
-                      <div className="space-y-6">
-                        {/* Add New Work Entry */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200/50">
-                          <h4 className="text-md font-semibold text-slate-900 mb-4">Add New Work Entry</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Work Date</label>
-                              <input 
-                                type="date" 
-                                defaultValue="2024-01-15"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Project/Task</label>
-                              <input 
-                                type="text" 
-                                placeholder="Enter project or task name"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            <div className="flex items-end">
-                              <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                                <User className="h-4 w-4 mr-2" />
-                                Add Entry
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Monthly Work Summary */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-4 rounded-xl text-white">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-green-100 text-sm">This Month</p>
-                                <p className="text-2xl font-bold">24</p>
-                                <p className="text-green-100 text-sm">Projects Completed</p>
-                              </div>
-                              <CheckCircle className="h-8 w-8 text-green-200" />
-                            </div>
-                          </div>
-                          
-                          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 rounded-xl text-white">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-blue-100 text-sm">Total Hours</p>
-                                <p className="text-2xl font-bold">186</p>
-                                <p className="text-blue-100 text-sm">Working Hours</p>
-                              </div>
-                              <Clock className="h-8 w-8 text-blue-200" />
-                            </div>
-                          </div>
-                          
-                          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-xl text-white">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-purple-100 text-sm">Efficiency</p>
-                                <p className="text-2xl font-bold">94%</p>
-                                <p className="text-purple-100 text-sm">Performance Rate</p>
-                              </div>
-                              <TrendingUp className="h-8 w-8 text-purple-200" />
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Work History Timeline */}
-                        <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 border border-slate-200/50">
-                          <h4 className="text-lg font-semibold text-slate-900 mb-6">Recent Work History</h4>
-                          <div className="space-y-4">
-                            {[
-                              {
-                                date: '2024-01-15',
-                                project: 'Quality Control - Paper Grade A Testing',
-                                duration: '6 hours',
-                                status: 'Completed',
-                                priority: 'High',
-                                description: 'Conducted comprehensive quality testing for Grade A paper production batch #2401'
-                              },
-                              {
-                                date: '2024-01-14',
-                                project: 'Machine Maintenance - Pulp Processing Unit',
-                                duration: '4 hours',
-                                status: 'Completed',
-                                priority: 'Medium',
-                                description: 'Routine maintenance and calibration of pulp processing machinery'
-                              },
-                              {
-                                date: '2024-01-13',
-                                project: 'Process Optimization - Waste Reduction',
-                                duration: '8 hours',
-                                status: 'Completed',
-                                priority: 'High',
-                                description: 'Implemented new waste reduction protocols resulting in 15% efficiency improvement'
-                              },
-                              {
-                                date: '2024-01-12',
-                                project: 'Training Session - New Safety Protocols',
-                                duration: '3 hours',
-                                status: 'Completed',
-                                priority: 'Medium',
-                                description: 'Conducted safety training for junior staff on updated workplace protocols'
-                              },
-                              {
-                                date: '2024-01-11',
-                                project: 'Inventory Management - Raw Materials',
-                                duration: '5 hours',
-                                status: 'Completed',
-                                priority: 'Low',
-                                description: 'Updated inventory records and coordinated with suppliers for raw material procurement'
-                              },
-                              {
-                                date: '2024-01-10',
-                                project: 'Client Meeting - Product Specifications',
-                                duration: '2 hours',
-                                status: 'Completed',
-                                priority: 'High',
-                                description: 'Discussed custom paper specifications with major client for upcoming order'
-                              }
-                            ].map((work, index) => (
-                              <div key={index} className="relative pl-8 pb-4">
-                                {/* Timeline line */}
-                                {index !== 5 && (
-                                  <div className="absolute left-3 top-8 w-0.5 h-full bg-slate-200" />
-                                )}
-                                
-                                {/* Timeline dot */}
-                                <div className={`absolute left-1 top-2 w-4 h-4 rounded-full border-2 ${
-                                  work.priority === 'High' ? 'bg-red-500 border-red-300' :
-                                  work.priority === 'Medium' ? 'bg-yellow-500 border-yellow-300' :
-                                  'bg-green-500 border-green-300'
-                                }`} />
-                                
-                                {/* Work entry content */}
-                                <div className="bg-slate-50/80 rounded-lg p-4 hover:bg-slate-100/80 transition-colors">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div className="flex-1">
-                                      <h5 className="font-semibold text-slate-900">{work.project}</h5>
-                                      <p className="text-sm text-slate-600 mt-1">{work.description}</p>
-                                    </div>
-                                    <div className="text-right ml-4">
-                                      <div className="text-sm font-medium text-slate-700">{work.date}</div>
-                                      <div className="text-xs text-slate-500">{work.duration}</div>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                      <Badge 
-                                        variant="secondary" 
-                                        className={`text-xs ${
-                                          work.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                          work.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-green-100 text-green-800'
-                                        }`}
-                                      >
-                                        {work.priority} Priority
-                                      </Badge>
-                                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                                        {work.status}
-                                      </Badge>
-                                    </div>
-                                    <div className="flex items-center text-slate-500">
-                                      <Clock className="h-3 w-3 mr-1" />
-                                      <span className="text-xs">{work.duration}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {/* Load More Button */}
-                          <div className="text-center mt-6">
-                            <Button variant="outline" className="text-slate-600 hover:text-slate-900">
-                              <CalendarIcon className="h-4 w-4 mr-2" />
-                              Load More History
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Section>
-                    
-                    {/* Contract Work Section */}
-                    <Section title="Contract Work" desc="Packet/Bundle • Reem Cutting • Folding" icon={Briefcase}>
-                      <Tabs defaultValue="packet" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 bg-slate-100/80">
-                          <TabsTrigger value="packet" className="flex items-center space-x-2">
-                            <Package className="h-4 w-4" />
-                            <span>Packet/Bundle</span>
-                          </TabsTrigger>
-                          <TabsTrigger value="reem" className="flex items-center space-x-2">
-                            <Scissors className="h-4 w-4" />
-                            <span>Reem Cutting</span>
-                          </TabsTrigger>
-                          <TabsTrigger value="fold" className="flex items-center space-x-2">
-                            <FoldHorizontal className="h-4 w-4" />
-                            <span>Folding</span>
-                          </TabsTrigger>
-                        </TabsList>
-                        
-                        <TabsContent value="packet" className="mt-6">
-                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                             <Field id="regular_packet" label="Regular Packet Rate" value="₹0.80" />
-                             <Field id="deluxe_packet" label="Deluxe Packet Rate" value="₹1.00" />
-                             <Field id="bundle_stitch" label="Bundle Stitching Rate" value="₹6.00" />
-                           </div>
-                         </TabsContent>
-                        
-                        <TabsContent value="reem" className="mt-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field id="rc_date" label="Date" type="date" />
-                            <Field id="rc_product" label="Product Name" />
-                            <Field id="rc_reem_weight" label="Reem Weight" />
-                            <Field id="rc_rate_ton" label="Rate per TON" />
-                          </div>
-                        </TabsContent>
-                        
-                        <TabsContent value="fold" className="mt-6">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Field id="fd_date" label="Date" type="date" />
-                            <Field id="fd_price" label="Price" />
-                            <Field id="fd_maths_80c" label="Maths 80C" />
-                            <Field id="fd_drawing_c" label="Drawing C" />
-                            <Field id="fd_graph_c" label="Graph C" />
-                            <Field id="fd_geometry_c" label="Geometry C" />
-                          </div>
-                        </TabsContent>
-                      </Tabs>
-                    </Section>
-                  </div>
-                </TabsContent>
-
-                {/* Documents Tab */}
-                <TabsContent value="documents" className="p-6">
-                  <div className="space-y-6">
-                    {/* Document Categories */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {/* Identity Documents */}
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200/50">
-                        <div className="flex items-center mb-4">
-                          <div className="bg-blue-500 p-2 rounded-lg mr-3">
-                            <User className="h-5 w-5 text-white" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900">Identity Documents</h3>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">PAN Card</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                // Simulate PDF download
-                                const link = document.createElement('a');
-                                link.href = '/documents/pan-card-roger-smith.pdf';
-                                link.download = 'PAN_Card_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">AADHAR Card</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/aadhar-card-roger-smith.pdf';
-                                link.download = 'AADHAR_Card_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Passport</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/passport-roger-smith.pdf';
-                                link.download = 'Passport_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Banking Documents */}
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200/50">
-                        <div className="flex items-center mb-4">
-                          <div className="bg-green-500 p-2 rounded-lg mr-3">
-                            <CreditCard className="h-5 w-5 text-white" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900">Banking Documents</h3>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Bank PassBook</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/bank-passbook-roger-smith.pdf';
-                                link.download = 'Bank_PassBook_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Cancelled Cheque</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/cancelled-cheque-roger-smith.pdf';
-                                link.download = 'Cancelled_Cheque_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Bank Statement</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/bank-statement-roger-smith.pdf';
-                                link.download = 'Bank_Statement_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Employment Documents */}
-                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-200/50">
-                        <div className="flex items-center mb-4">
-                          <div className="bg-purple-500 p-2 rounded-lg mr-3">
-                            <Briefcase className="h-5 w-5 text-white" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900">Employment Docs</h3>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Offer Letter</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/offer-letter-roger-smith.pdf';
-                                link.download = 'Offer_Letter_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Experience Letter</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/experience-letter-roger-smith.pdf';
-                                link.download = 'Experience_Letter_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white/80 p-3 rounded-lg">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                              <span className="text-sm font-medium text-slate-700">Salary Certificate</span>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 text-xs"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = '/documents/salary-certificate-roger-smith.pdf';
-                                link.download = 'Salary_Certificate_Roger_Smith.pdf';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
                           </div>
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Document Management Actions */}
-                    <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 border border-slate-200/50">
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <h3 className="text-lg font-semibold text-slate-900">Document Management</h3>
-                          <p className="text-sm text-slate-600 mt-1">Upload, manage and organize employee documents</p>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <Button variant="outline" size="sm">
-                            <FileText className="h-4 w-4 mr-2" />
-                            Upload New
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                            onClick={() => {
-                              // Download all documents as ZIP
-                              const link = document.createElement('a');
-                              link.href = '/documents/all-documents-roger-smith.zip';
-                              link.download = 'All_Documents_Roger_Smith.zip';
-                              link.click();
-                            }}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download All
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Document Statistics */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 rounded-lg text-white">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-blue-100 text-sm">Total Documents</p>
-                              <p className="text-2xl font-bold">9</p>
-                            </div>
-                            <FileText className="h-6 w-6 text-blue-200" />
-                          </div>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-4 rounded-lg text-white">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-green-100 text-sm">Verified</p>
-                              <p className="text-2xl font-bold">9</p>
-                            </div>
-                            <CheckCircle className="h-6 w-6 text-green-200" />
-                          </div>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 p-4 rounded-lg text-white">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-yellow-100 text-sm">Pending</p>
-                              <p className="text-2xl font-bold">0</p>
-                            </div>
-                            <Clock className="h-6 w-6 text-yellow-200" />
-                          </div>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-lg text-white">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-purple-100 text-sm">Last Updated</p>
-                              <p className="text-sm font-semibold">Jan 15, 2024</p>
-                            </div>
-                            <CalendarIcon className="h-6 w-6 text-purple-200" />
-                          </div>
-                        </div>
-                      </div>
+
+                    {/* Save Button */}
+                    <div className="flex justify-end">
+                      <Button 
+                        onClick={handleSaveEmployee}
+                        disabled={saving}
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-lg"
+                      >
+                        {saving ? 'Saving...' : 'Save Salary Configuration'}
+                      </Button>
                     </div>
                   </div>
                 </TabsContent>
               </Tabs>
             </div>
           </div>
-          )
-          }
+          )}
         </main>
       </div>
-      
-      {/* Modern Attendance Modal */}
-      {showAttendanceModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            {/* Header with gradient */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-bold">Mark Attendance</h3>
-                  <p className="text-blue-100 text-sm mt-1">
-                    {selectedDate?.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAttendanceModal(false)}
-                  className="text-white hover:bg-white/20 rounded-full p-2"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              {/* Status Selection with modern cards */}
-              <div>
-                <Label className="text-sm font-semibold text-slate-800 mb-3 block">
-                  Attendance Status
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setModalAttendanceStatus('present')}
-                    className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                      modalAttendanceStatus === 'present' 
-                        ? 'border-green-500 bg-green-50 shadow-lg scale-105' 
-                        : 'border-slate-200 bg-slate-50 hover:border-green-300 hover:bg-green-50/50'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center space-y-2">
-                      <div className={`p-2 rounded-full ${
-                        modalAttendanceStatus === 'present' ? 'bg-green-500' : 'bg-slate-400'
-                      }`}>
-                        <CheckCircle className="h-5 w-5 text-white" />
-                      </div>
-                      <span className={`font-medium text-sm ${
-                        modalAttendanceStatus === 'present' ? 'text-green-700' : 'text-slate-600'
-                      }`}>
-                        Present
-                      </span>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setModalAttendanceStatus('absent')}
-                    className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                      modalAttendanceStatus === 'absent' 
-                        ? 'border-red-500 bg-red-50 shadow-lg scale-105' 
-                        : 'border-slate-200 bg-slate-50 hover:border-red-300 hover:bg-red-50/50'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center space-y-2">
-                      <div className={`p-2 rounded-full ${
-                        modalAttendanceStatus === 'absent' ? 'bg-red-500' : 'bg-slate-400'
-                      }`}>
-                        <XCircle className="h-5 w-5 text-white" />
-                      </div>
-                      <span className={`font-medium text-sm ${
-                        modalAttendanceStatus === 'absent' ? 'text-red-700' : 'text-slate-600'
-                      }`}>
-                        Absent
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Working Hours Input with modern styling */}
-              {modalAttendanceStatus === 'present' && (
-                <div className="animate-in slide-in-from-top-2 duration-300">
-                  <Label htmlFor="working-hours" className="text-sm font-semibold text-slate-800 mb-3 block">
-                    Working Hours
-                  </Label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
-                    <Input
-                      id="working-hours"
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={modalWorkingHours}
-                      onChange={(e) => setModalWorkingHours(parseFloat(e.target.value) || 0)}
-                      placeholder="8.0"
-                      className="pl-10 h-12 text-lg font-medium border-2 border-slate-200 focus:border-blue-500 rounded-xl"
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-slate-500">
-                      hours
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Standard working hours: 8.0 hours per day
-                  </p>
-                </div>
-              )}
-              
-              {/* Action Buttons with modern styling */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowAttendanceModal(false)}
-                  className="flex-1 h-12 rounded-xl border-2 hover:bg-slate-50 font-medium"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    // Save attendance data and update hours tracking with localStorage
-                    if (selectedDate) {
-                      const dateKey = selectedDate.toISOString().split('T')[0];
-                      const newAttendanceHours = { ...attendanceHours };
-                      
-                      if (modalAttendanceStatus === 'present') {
-                        newAttendanceHours[dateKey] = modalWorkingHours;
-                      } else {
-                        delete newAttendanceHours[dateKey];
-                      }
-                      
-                      setAttendanceHours(newAttendanceHours);
-                      
-                      // Update attendance status
-                      const newAttendance = { ...attendance };
-                      newAttendance[dateKey] = modalAttendanceStatus === 'present' ? 'P' : 'A';
-                      setAttendance(newAttendance);
-                      
-                      // Save to localStorage for persistence
-                      localStorage.setItem('attendanceHours', JSON.stringify(newAttendanceHours));
-                      localStorage.setItem('attendance', JSON.stringify(newAttendance));
-                      
-                      // Show success notification
-                      setNotification({
-                        show: true,
-                        message: `Attendance ${modalAttendanceStatus === 'present' ? 'marked as Present' : 'marked as Absent'} for ${selectedDate.toLocaleDateString()}`,
-                        type: 'success'
-                      });
-                      
-                      // Auto-hide notification after 3 seconds
-                      setTimeout(() => {
-                        setNotification(prev => ({ ...prev, show: false }));
-                      }, 3000);
-                    }
-                    setShowAttendanceModal(false);
-                  }}
-                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 font-medium shadow-lg"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Attendance
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Success/Error Notification */}
-      {notification.show && (
-        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
-          <div className={`p-4 rounded-xl shadow-lg border-l-4 ${
-            notification.type === 'success' 
-              ? 'bg-green-50 border-green-500 text-green-800' 
-              : 'bg-red-50 border-red-500 text-red-800'
-          }`}>
-            <div className="flex items-center space-x-3">
-              {notification.type === 'success' ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-600" />
-              )}
-              <p className="font-medium text-sm">{notification.message}</p>
-              <button
-                onClick={() => setNotification(prev => ({ ...prev, show: false }))}
-                className="ml-auto text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
