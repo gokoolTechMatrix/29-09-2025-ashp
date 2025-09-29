@@ -98,6 +98,11 @@ export default function EmployeeDetailsPage() {
     employment_type: '',
     contract_type: '',
     join_date: '',
+    reel_unloading: '',
+    regular_packet: '',
+    reel_to_sheet_cutting_machine: '',
+    ruling_machine: '',
+    loadman_box_and_dispatch: '',
     
     // Education & Experience
     education_qualification: '',
@@ -151,6 +156,70 @@ export default function EmployeeDetailsPage() {
   
   // Attendance tracking for salary calculation with localStorage persistence
   const [attendanceHours, setAttendanceHours] = useState<Record<string, number>>({});
+
+  // Reel Unloading form state
+  const [reelUnloading, setReelUnloading] = useState<{
+    name: string;
+    date: Date | undefined;
+    pricePerTon: string;
+    totalPrice: string;
+    productName: string;
+    showDatePicker?: boolean;
+  }>({ name: "", date: undefined, pricePerTon: "", totalPrice: "", productName: "", showDatePicker: false });
+
+  // Reel to Sheet Cutting Machine Pricing state
+  const [reelCutting, setReelCutting] = useState<{
+    name: string;
+    date: Date | undefined;
+    productName: string;
+    cuttingSize: string;
+    reemWeight: string;
+    ratePerTon: string;
+    amount: string;
+    showDatePicker?: boolean;
+  }>({ name: "", date: undefined, productName: "", cuttingSize: "", reemWeight: "", ratePerTon: "", amount: "", showDatePicker: false });
+
+  // Regular Packet state
+  const [regularPacket, setRegularPacket] = useState<{
+    name: string;
+    date: Date | undefined;
+    productOption: "regular" | "deluxe" | "bundle" | "";
+    totalPrice: string;
+    showDatePicker?: boolean;
+  }>({ name: "", date: undefined, productOption: "", totalPrice: "", showDatePicker: false });
+  
+  // Ruling Machine state
+  const [rulingMachine, setRulingMachine] = useState<{
+    name: string;
+    date: Date | undefined;
+    productName: string;
+    pricePerTon: string;
+    quantity: string;
+    totalPrice: string;
+    showDatePicker?: boolean;
+  }>({ name: "", date: undefined, productName: "", pricePerTon: "", quantity: "", totalPrice: "", showDatePicker: false });
+
+  // Loadman box and Dispatch state
+  const [loadman, setLoadman] = useState<{
+    name: string;
+    date: Date | undefined;
+    loadingDetails: "tnpl_box" | "spb_box" | "wrapper_unloading" | "auto_loading" | "waste_loading" | "bundle_unloading" | "export_box" | "spb_bundle_ruled" | "spb_bundle_unruled" | "";
+    quantity: string;
+    pricePerTon: string;
+    totalAmount: string;
+    showDatePicker?: boolean;
+  }>({ name: "", date: undefined, loadingDetails: "", quantity: "", pricePerTon: "", totalAmount: "", showDatePicker: false });
+  
+  // Special Work state
+  const [specialWork, setSpecialWork] = useState<{
+    name: string;
+    date: Date | undefined;
+    typeOfWork: string;
+    price: string;
+    quantity: string;
+    totalAmount: string;
+    showDatePicker?: boolean;
+  }>({ name: "", date: undefined, typeOfWork: "", price: "", quantity: "", totalAmount: "", showDatePicker: false });
   
   // Notification state for visual feedback
   const [notification, setNotification] = useState<{
@@ -345,6 +414,11 @@ export default function EmployeeDetailsPage() {
               employment_type: details.employment_type || '',
               contract_type: details.contract_type || '',
               join_date: details.join_date || '',
+              reel_unloading: details.reel_unloading || '',
+              regular_packet: details.regular_packet || '',
+              reel_to_sheet_cutting_machine: details.reel_to_sheet_cutting_machine || '',
+              ruling_machine: details.ruling_machine || '',
+              loadman_box_and_dispatch: details.loadman_box_and_dispatch || '',
               
               // Education & Experience
               education_qualification: details.education_qualification || '',
@@ -888,12 +962,12 @@ export default function EmployeeDetailsPage() {
             <div className="relative group">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
             <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-200/50 border border-white/20">
-              <Tabs defaultValue="details" className="w-full">
+              <Tabs defaultValue="emp_salary" className="w-full">
                 <div className="border-b border-slate-200/50 px-6 pt-6">
-                  <TabsList className="grid w-full grid-cols-5 bg-slate-100/80 backdrop-blur-sm">
-                    <TabsTrigger value="details" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                      <User className="h-4 w-4 mr-2" />
-                      Details
+                  <TabsList className="grid w-full grid-cols-4 bg-slate-100/80 backdrop-blur-sm">
+                    <TabsTrigger value="emp_salary" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                      <Briefcase className="h-4 w-4 mr-2" />
+                      Employement and Salary Details
                     </TabsTrigger>
                     <TabsTrigger value="attendance" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                       <CalendarIcon className="h-4 w-4 mr-2" />
@@ -903,10 +977,6 @@ export default function EmployeeDetailsPage() {
                       <Briefcase className="h-4 w-4 mr-2" />
                       Contract
                     </TabsTrigger>
-                    <TabsTrigger value="salary" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Salary
-                    </TabsTrigger>
                     <TabsTrigger value="documents" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                       <FileText className="h-4 w-4 mr-2" />
                       Documents
@@ -914,8 +984,8 @@ export default function EmployeeDetailsPage() {
                   </TabsList>
                 </div>
 
-                {/* Employee Details Tab */}
-                <TabsContent value="details" className="p-6 space-y-6">
+                {/* Employment and Salary Details (Combined) */}
+                <TabsContent value="emp_salary" className="p-6 space-y-6">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1">
                       <div className="relative group">
@@ -1075,13 +1145,13 @@ export default function EmployeeDetailsPage() {
                           </div>
                         </div>
 
-                        {/* Employment Details Section */}
+                        {/* Employement and Salary Details Section (merged) */}
                         <div className="relative group">
                           <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400/10 to-emerald-400/10 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
                           <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
                             <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
                               <Briefcase className="h-5 w-5 mr-2 text-green-600" />
-                              Employment Details
+                              Employement and Salary Details
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2">
@@ -1149,66 +1219,19 @@ export default function EmployeeDetailsPage() {
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
                                 />
                               </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="workLocation" className="text-sm font-medium text-slate-700">Work Location</Label>
-                                <Input
-                                  id="workLocation"
-                                  value={employeeData?.employee_details?.[0]?.work_location || ''}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('work_location', e.target.value)}
-                                  className="bg-white/80 backdrop-blur-sm border-slate-200/50"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="shiftTiming" className="text-sm font-medium text-slate-700">Shift Timing</Label>
-                                <Input
-                                  id="shiftTiming"
-                                  value={employeeData?.employee_details?.[0]?.shift_timing || ''}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('shift_timing', e.target.value)}
-                                  className="bg-white/80 backdrop-blur-sm border-slate-200/50"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="probationPeriod" className="text-sm font-medium text-slate-700">Probation Period (Months)</Label>
-                                <Input
-                                  id="probationPeriod"
-                                  type="number"
-                                  value={employeeData?.employee_details?.[0]?.probation_period_months || ''}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('probation_period_months', e.target.value)}
-                                  className="bg-white/80 backdrop-blur-sm border-slate-200/50"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="confirmationDate" className="text-sm font-medium text-slate-700">Confirmation Date</Label>
-                                <Input
-                                  id="confirmationDate"
-                                  type="date"
-                                  value={employeeData?.employee_details?.[0]?.confirmation_date || ''}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('confirmation_date', e.target.value)}
-                                  className="bg-white/80 backdrop-blur-sm border-slate-200/50"
-                                />
-                              </div>
                             </div>
-                          </div>
-                        </div>
 
-                        {/* Salary Information Section */}
-                        <div className="relative group">
-                          <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-400/10 to-purple-400/10 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
-                          <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
-                            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-                              <CreditCard className="h-5 w-5 mr-2 text-purple-600" />
-                              Salary Information
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Salary Information (merged inside the same card) */}
+                            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label htmlFor="basic_salary">Basic Salary</Label>
+                                <Label htmlFor="basic_salary">Starting Salary</Label>
                                 <Input
                                   id="basic_salary"
                                   name="basic_salary"
                                   type="number"
                                   value={formData.basic_salary || ''}
                                   onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('basic_salary', e.target.value)}
-                                  placeholder="Basic Salary"
+                                  placeholder="Starting Salary"
                                 />
                               </div>
                               <div className="space-y-2">
@@ -1493,9 +1516,643 @@ export default function EmployeeDetailsPage() {
                   </div>
                 </TabsContent>
 
-                {/* Simplified Salary Tab - Monthly & Hourly Only */}
-                <TabsContent value="salary" className="p-6">
-                  <div className="space-y-8">
+                {/* Contract Tab with Sub-tabs */}
+                <TabsContent value="contract" className="p-6 space-y-6">
+                  <div className="relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400/10 to-indigo-400/10 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
+                    <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                        <Briefcase className="h-5 w-5 mr-2 text-blue-600" />
+                        Contract Details
+                      </h3>
+                      <Tabs defaultValue="reel_unloading" className="w-full">
+                        <div className="border-b border-slate-200/50 mb-4">
+                          <TabsList className="grid w-full grid-cols-6 bg-slate-100/80 backdrop-blur-sm">
+                            <TabsTrigger value="reel_unloading" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                              Reel Unloading
+                            </TabsTrigger>
+                            <TabsTrigger value="regular_packet" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                              Regular packet
+                            </TabsTrigger>
+                            <TabsTrigger value="reel_to_sheet_cutting_machine" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                              Reel to sheet cutting machine
+                            </TabsTrigger>
+                            <TabsTrigger value="ruling_machine" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                              Ruling Machine
+                            </TabsTrigger>
+                            <TabsTrigger value="loadman_box_and_dispatch" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                              Loadman box and Dispatch
+                            </TabsTrigger>
+                            <TabsTrigger value="special_work" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                              Special Work
+                            </TabsTrigger>
+                          </TabsList>
+                        </div>
+
+                        <TabsContent value="reel_unloading" className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="ru_name">Name</Label>
+                              <Input
+                                id="ru_name"
+                                value={reelUnloading.name}
+                                onChange={(e) => setReelUnloading((s) => ({ ...s, name: e.target.value }))}
+                                placeholder="Enter name"
+                              />
+                            </div>
+
+                            {/* Product Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="ru_product">Product Name</Label>
+                              <Input
+                                id="ru_product"
+                                value={reelUnloading.productName}
+                                onChange={(e) => setReelUnloading((s) => ({ ...s, productName: e.target.value }))}
+                                placeholder="Enter product name"
+                              />
+                            </div>
+
+                            {/* Date with Advanced Calendar */}
+                            <div className="space-y-2">
+                              <Label htmlFor="ru_date">Date</Label>
+                              <div className="relative">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="ru_date"
+                                    readOnly
+                                    value={reelUnloading.date ? reelUnloading.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                    placeholder="Select a date"
+                                  />
+                                  <Button type="button" variant="outline" onClick={() => setReelUnloading((s)=>({ ...s, showDatePicker: !s.showDatePicker }))}>Pick</Button>
+                                </div>
+                                {reelUnloading.showDatePicker && (
+                                  <div className="absolute z-50 mt-2 w-full md:w-auto rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                    <Calendar
+                                      mode="single"
+                                      selected={reelUnloading.date}
+                                      onSelect={(d)=> setReelUnloading((s)=>({ ...s, date: d }))}
+                                      captionLayout="dropdown"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear() + 5}
+                                      showOutsideDays
+                                      className="mx-auto"
+                                    />
+                                    <div className="mt-3 flex justify-between">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => setReelUnloading((s)=>({ ...s, date: new Date() }))}>Today</Button>
+                                      <div className="space-x-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setReelUnloading((s)=>({ ...s, date: undefined }))}>Clear</Button>
+                                        <Button type="button" size="sm" onClick={() => setReelUnloading((s)=>({ ...s, showDatePicker: false }))}>Done</Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Price per Ton with Rupee prefix */}
+                            <div className="space-y-2">
+                              <Label htmlFor="ru_price_per_ton">Price per Ton</Label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">₹</span>
+                                <Input
+                                  id="ru_price_per_ton"
+                                  type="number"
+                                  inputMode="decimal"
+                                  className="pl-7"
+                                  value={reelUnloading.pricePerTon}
+                                  onChange={(e)=> setReelUnloading((s)=>({ ...s, pricePerTon: e.target.value }))}
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Total Price */}
+                            <div className="space-y-2">
+                              <Label htmlFor="ru_total_price">Total Price</Label>
+                              <Input
+                                id="ru_total_price"
+                                type="number"
+                                inputMode="decimal"
+                                value={reelUnloading.totalPrice}
+                                onChange={(e)=> setReelUnloading((s)=>({ ...s, totalPrice: e.target.value }))}
+                                placeholder="Enter total price"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="special_work" className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="sw_name">Name</Label>
+                              <Input
+                                id="sw_name"
+                                value={specialWork.name}
+                                onChange={(e) => setSpecialWork((s)=>({ ...s, name: e.target.value }))}
+                                placeholder="Enter name"
+                              />
+                            </div>
+
+                            {/* Type of Work */}
+                            <div className="space-y-2">
+                              <Label htmlFor="sw_type">Type of Work</Label>
+                              <Input
+                                id="sw_type"
+                                value={specialWork.typeOfWork}
+                                onChange={(e) => setSpecialWork((s)=>({ ...s, typeOfWork: e.target.value }))}
+                                placeholder="Enter type of work"
+                              />
+                            </div>
+
+                            {/* Date */}
+                            <div className="space-y-2">
+                              <Label htmlFor="sw_date">Date</Label>
+                              <div className="relative">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="sw_date"
+                                    readOnly
+                                    value={specialWork.date ? specialWork.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                    placeholder="Select a date"
+                                  />
+                                  <Button type="button" variant="outline" onClick={() => setSpecialWork((s)=>({ ...s, showDatePicker: !s.showDatePicker }))}>Pick</Button>
+                                </div>
+                                {specialWork.showDatePicker && (
+                                  <div className="absolute z-50 mt-2 w-full md:w-auto rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                    <Calendar
+                                      mode="single"
+                                      selected={specialWork.date}
+                                      onSelect={(d)=> setSpecialWork((s)=>({ ...s, date: d }))}
+                                      captionLayout="dropdown"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear() + 5}
+                                      showOutsideDays
+                                      className="mx-auto"
+                                    />
+                                    <div className="mt-3 flex justify-between">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => setSpecialWork((s)=>({ ...s, date: new Date() }))}>Today</Button>
+                                      <div className="space-x-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setSpecialWork((s)=>({ ...s, date: undefined }))}>Clear</Button>
+                                        <Button type="button" size="sm" onClick={() => setSpecialWork((s)=>({ ...s, showDatePicker: false }))}>Done</Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Price */}
+                            <div className="space-y-2">
+                              <Label htmlFor="sw_price">Price</Label>
+                              <Input
+                                id="sw_price"
+                                type="number"
+                                inputMode="decimal"
+                                value={specialWork.price}
+                                onChange={(e)=> setSpecialWork((s)=>({ ...s, price: e.target.value }))}
+                                placeholder="Enter price"
+                              />
+                            </div>
+
+                            {/* Quantity */}
+                            <div className="space-y-2">
+                              <Label htmlFor="sw_quantity">Quantity</Label>
+                              <Input
+                                id="sw_quantity"
+                                type="number"
+                                inputMode="decimal"
+                                value={specialWork.quantity}
+                                onChange={(e)=> setSpecialWork((s)=>({ ...s, quantity: e.target.value }))}
+                                placeholder="Enter quantity"
+                              />
+                            </div>
+
+                            {/* Total Amount */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label htmlFor="sw_total_amount">Total Amount</Label>
+                              <Input
+                                id="sw_total_amount"
+                                type="number"
+                                inputMode="decimal"
+                                value={specialWork.totalAmount}
+                                onChange={(e)=> setSpecialWork((s)=>({ ...s, totalAmount: e.target.value }))}
+                                placeholder="Enter total amount"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="regular_packet" className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rp_name">Name</Label>
+                              <Input
+                                id="rp_name"
+                                value={regularPacket.name}
+                                onChange={(e) => setRegularPacket((s)=>({ ...s, name: e.target.value }))}
+                                placeholder="Enter employee name"
+                              />
+                            </div>
+
+                            {/* Date */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rp_date">Date</Label>
+                              <div className="relative">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="rp_date"
+                                    readOnly
+                                    value={regularPacket.date ? regularPacket.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                    placeholder="Select a date"
+                                  />
+                                  <Button type="button" variant="outline" onClick={() => setRegularPacket((s)=>({ ...s, showDatePicker: !s.showDatePicker }))}>Pick</Button>
+                                </div>
+                                {regularPacket.showDatePicker && (
+                                  <div className="absolute z-50 mt-2 w-full md:w-auto rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                    <Calendar
+                                      mode="single"
+                                      selected={regularPacket.date}
+                                      onSelect={(d)=> setRegularPacket((s)=>({ ...s, date: d }))}
+                                      captionLayout="dropdown"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear() + 5}
+                                      showOutsideDays
+                                      className="mx-auto"
+                                    />
+                                    <div className="mt-3 flex justify-between">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => setRegularPacket((s)=>({ ...s, date: new Date() }))}>Today</Button>
+                                      <div className="space-x-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setRegularPacket((s)=>({ ...s, date: undefined }))}>Clear</Button>
+                                        <Button type="button" size="sm" onClick={() => setRegularPacket((s)=>({ ...s, showDatePicker: false }))}>Done</Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Product Name dropdown with mapped values */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rp_product">Product Name</Label>
+                              <select
+                                id="rp_product"
+                                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                value={regularPacket.productOption}
+                                onChange={(e) => setRegularPacket((s)=>({ ...s, productOption: e.target.value as any }))}
+                              >
+                                <option value="">Select option</option>
+                                <option value="regular">Regular Packet — 0.80 ₹</option>
+                                <option value="deluxe">Deluxe Packet — 1.00 ₹</option>
+                                <option value="bundle">Bundle Packet — 6.00 ₹</option>
+                              </select>
+                              <p className="text-xs text-slate-500">
+                                Selected price:
+                                {regularPacket.productOption === 'regular' && ' 0.80 ₹'}
+                                {regularPacket.productOption === 'deluxe' && ' 1.00 ₹'}
+                                {regularPacket.productOption === 'bundle' && ' 6.00 ₹'}
+                                {(!regularPacket.productOption) && ' —'}
+                              </p>
+                            </div>
+
+                            {/* Total Price */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rp_total_price">Total Price</Label>
+                              <Input
+                                id="rp_total_price"
+                                type="number"
+                                inputMode="decimal"
+                                value={regularPacket.totalPrice}
+                                onChange={(e)=> setRegularPacket((s)=>({ ...s, totalPrice: e.target.value }))}
+                                placeholder="Enter total price"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="reel_to_sheet_cutting_machine" className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_name">Name</Label>
+                              <Input
+                                id="rc_name"
+                                value={reelCutting.name}
+                                onChange={(e) => setReelCutting((s) => ({ ...s, name: e.target.value }))}
+                                placeholder="Enter name"
+                              />
+                            </div>
+
+                            {/* Product Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_product">Product Name</Label>
+                              <Input
+                                id="rc_product"
+                                value={reelCutting.productName}
+                                onChange={(e) => setReelCutting((s) => ({ ...s, productName: e.target.value }))}
+                                placeholder="Enter product name"
+                              />
+                            </div>
+
+                            {/* Date */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_date">Date</Label>
+                              <div className="relative">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="rc_date"
+                                    readOnly
+                                    value={reelCutting.date ? reelCutting.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                    placeholder="Select a date"
+                                  />
+                                  <Button type="button" variant="outline" onClick={() => setReelCutting((s)=>({ ...s, showDatePicker: !s.showDatePicker }))}>Pick</Button>
+                                </div>
+                                {reelCutting.showDatePicker && (
+                                  <div className="absolute z-50 mt-2 w-full md:w-auto rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                    <Calendar
+                                      mode="single"
+                                      selected={reelCutting.date}
+                                      onSelect={(d)=> setReelCutting((s)=>({ ...s, date: d }))}
+                                      captionLayout="dropdown"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear() + 5}
+                                      showOutsideDays
+                                      className="mx-auto"
+                                    />
+                                    <div className="mt-3 flex justify-between">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => setReelCutting((s)=>({ ...s, date: new Date() }))}>Today</Button>
+                                      <div className="space-x-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setReelCutting((s)=>({ ...s, date: undefined }))}>Clear</Button>
+                                        <Button type="button" size="sm" onClick={() => setReelCutting((s)=>({ ...s, showDatePicker: false }))}>Done</Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Cutting Size */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_cutting_size">Cutting Size</Label>
+                              <Input
+                                id="rc_cutting_size"
+                                value={reelCutting.cuttingSize}
+                                onChange={(e) => setReelCutting((s) => ({ ...s, cuttingSize: e.target.value }))}
+                                placeholder="Enter cutting size"
+                              />
+                            </div>
+
+                            {/* Reem Weight */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_reem_weight">Reem Weight</Label>
+                              <Input
+                                id="rc_reem_weight"
+                                value={reelCutting.reemWeight}
+                                onChange={(e) => setReelCutting((s) => ({ ...s, reemWeight: e.target.value }))}
+                                placeholder="Enter reem weight"
+                              />
+                            </div>
+
+                            {/* Rate Per Ton */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_rate_per_ton">Rate Per Ton</Label>
+                              <Input
+                                id="rc_rate_per_ton"
+                                value={reelCutting.ratePerTon}
+                                onChange={(e) => setReelCutting((s) => ({ ...s, ratePerTon: e.target.value }))}
+                                placeholder="Enter rate per ton"
+                              />
+                            </div>
+
+                            {/* Amount */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rc_amount">Amount</Label>
+                              <Input
+                                id="rc_amount"
+                                value={reelCutting.amount}
+                                onChange={(e) => setReelCutting((s) => ({ ...s, amount: e.target.value }))}
+                                placeholder="Enter amount"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="ruling_machine" className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rm_name">Name</Label>
+                              <Input
+                                id="rm_name"
+                                value={rulingMachine.name}
+                                onChange={(e) => setRulingMachine((s)=>({ ...s, name: e.target.value }))}
+                                placeholder="Enter employee name"
+                              />
+                            </div>
+
+                            {/* Product Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rm_product">Product Name</Label>
+                              <Input
+                                id="rm_product"
+                                value={rulingMachine.productName}
+                                onChange={(e) => setRulingMachine((s)=>({ ...s, productName: e.target.value }))}
+                                placeholder="Enter product name"
+                              />
+                            </div>
+
+                            {/* Date */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rm_date">Date</Label>
+                              <div className="relative">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="rm_date"
+                                    readOnly
+                                    value={rulingMachine.date ? rulingMachine.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                    placeholder="Select a date"
+                                  />
+                                  <Button type="button" variant="outline" onClick={() => setRulingMachine((s)=>({ ...s, showDatePicker: !s.showDatePicker }))}>Pick</Button>
+                                </div>
+                                {rulingMachine.showDatePicker && (
+                                  <div className="absolute z-50 mt-2 w-full md:w-auto rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                    <Calendar
+                                      mode="single"
+                                      selected={rulingMachine.date}
+                                      onSelect={(d)=> setRulingMachine((s)=>({ ...s, date: d }))}
+                                      captionLayout="dropdown"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear() + 5}
+                                      showOutsideDays
+                                      className="mx-auto"
+                                    />
+                                    <div className="mt-3 flex justify-between">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => setRulingMachine((s)=>({ ...s, date: new Date() }))}>Today</Button>
+                                      <div className="space-x-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setRulingMachine((s)=>({ ...s, date: undefined }))}>Clear</Button>
+                                        <Button type="button" size="sm" onClick={() => setRulingMachine((s)=>({ ...s, showDatePicker: false }))}>Done</Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Price per Ton */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rm_price_per_ton">Price per Ton</Label>
+                              <Input
+                                id="rm_price_per_ton"
+                                type="number"
+                                inputMode="decimal"
+                                value={rulingMachine.pricePerTon}
+                                onChange={(e)=> setRulingMachine((s)=>({ ...s, pricePerTon: e.target.value }))}
+                                placeholder="Enter price per ton"
+                              />
+                            </div>
+
+                            {/* Quantity */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rm_quantity">Quantity</Label>
+                              <Input
+                                id="rm_quantity"
+                                type="number"
+                                inputMode="decimal"
+                                value={rulingMachine.quantity}
+                                onChange={(e)=> setRulingMachine((s)=>({ ...s, quantity: e.target.value }))}
+                                placeholder="Enter quantity"
+                              />
+                            </div>
+
+                            {/* Total Price */}
+                            <div className="space-y-2">
+                              <Label htmlFor="rm_total_price">Total Price</Label>
+                              <Input
+                                id="rm_total_price"
+                                type="number"
+                                inputMode="decimal"
+                                value={rulingMachine.totalPrice}
+                                onChange={(e)=> setRulingMachine((s)=>({ ...s, totalPrice: e.target.value }))}
+                                placeholder="Enter total price"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="loadman_box_and_dispatch" className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Name */}
+                            <div className="space-y-2">
+                              <Label htmlFor="lm_name">Name</Label>
+                              <Input
+                                id="lm_name"
+                                value={loadman.name}
+                                onChange={(e) => setLoadman((s)=>({ ...s, name: e.target.value }))}
+                                placeholder="Enter name"
+                              />
+                            </div>
+
+                            {/* Date */}
+                            <div className="space-y-2">
+                              <Label htmlFor="lm_date">Date</Label>
+                              <div className="relative">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="lm_date"
+                                    readOnly
+                                    value={loadman.date ? loadman.date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                    placeholder="Select a date"
+                                  />
+                                  <Button type="button" variant="outline" onClick={() => setLoadman((s)=>({ ...s, showDatePicker: !s.showDatePicker }))}>Pick</Button>
+                                </div>
+                                {loadman.showDatePicker && (
+                                  <div className="absolute z-50 mt-2 w-full md:w-auto rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                                    <Calendar
+                                      mode="single"
+                                      selected={loadman.date}
+                                      onSelect={(d)=> setLoadman((s)=>({ ...s, date: d }))}
+                                      captionLayout="dropdown"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear() + 5}
+                                      showOutsideDays
+                                      className="mx-auto"
+                                    />
+                                    <div className="mt-3 flex justify-between">
+                                      <Button type="button" variant="outline" size="sm" onClick={() => setLoadman((s)=>({ ...s, date: new Date() }))}>Today</Button>
+                                      <div className="space-x-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setLoadman((s)=>({ ...s, date: undefined }))}>Clear</Button>
+                                        <Button type="button" size="sm" onClick={() => setLoadman((s)=>({ ...s, showDatePicker: false }))}>Done</Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Loading Details dropdown */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label htmlFor="lm_loading_details">Loading Details</Label>
+                              <select
+                                id="lm_loading_details"
+                                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                value={loadman.loadingDetails}
+                                onChange={(e)=> setLoadman((s)=>({ ...s, loadingDetails: e.target.value as any }))}
+                              >
+                                <option value="">Select option</option>
+                                <option value="tnpl_box">TNPL Box — 3.50 ₹</option>
+                                <option value="spb_box">SPB Box — 3.50 ₹</option>
+                                <option value="wrapper_unloading">Wrapper Unloading — 100 ₹</option>
+                                <option value="auto_loading">Auto Loading — 300 ₹</option>
+                                <option value="waste_loading">Waste Loading — 1350 ₹</option>
+                                <option value="bundle_unloading">Bundle Unloading — 100 ₹</option>
+                                <option value="export_box">Export Box — 3 ₹</option>
+                                <option value="spb_bundle_ruled">SPB Bundle — Ruled</option>
+                                <option value="spb_bundle_unruled">SPB Bundle — Unruled</option>
+                              </select>
+                            </div>
+
+                            {/* Quantity */}
+                            <div className="space-y-2">
+                              <Label htmlFor="lm_quantity">Quantity</Label>
+                              <Input
+                                id="lm_quantity"
+                                type="number"
+                                inputMode="decimal"
+                                value={loadman.quantity}
+                                onChange={(e)=> setLoadman((s)=>({ ...s, quantity: e.target.value }))}
+                                placeholder="Enter quantity"
+                              />
+                            </div>
+
+                            {/* Price per Ton */}
+                            <div className="space-y-2">
+                              <Label htmlFor="lm_price_per_ton">Price per Ton</Label>
+                              <Input
+                                id="lm_price_per_ton"
+                                type="number"
+                                inputMode="decimal"
+                                value={loadman.pricePerTon}
+                                onChange={(e)=> setLoadman((s)=>({ ...s, pricePerTon: e.target.value }))}
+                                placeholder="Enter price per ton"
+                              />
+                            </div>
+
+                            {/* Total Amount */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label htmlFor="lm_total_amount">Total Amount</Label>
+                              <Input
+                                id="lm_total_amount"
+                                type="number"
+                                inputMode="decimal"
+                                value={loadman.totalAmount}
+                                onChange={(e)=> setLoadman((s)=>({ ...s, totalAmount: e.target.value }))}
+                                placeholder="Enter total amount"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                  {/* Salary Section (merged from Salary tab) */}
+                  <div className="p-6 space-y-8">
                     {/* Salary Configuration Header */}
                     <div className="text-center mb-8">
                       <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">

@@ -122,7 +122,7 @@ export default function StaffVendorManagement() {
 
   const sidebarItems = [
     { icon: BarChart3, label: "Dashboard", active: false, href: "/factory-dashboard" },
-    { icon: Users, label: "Staff & Vendor Management", active: true, href: "/staff-vendor-management" },
+    { icon: Users, label: "Attendance , Staff and Payroll management", active: true, href: "/staff-vendor-management" },
     { icon: Factory, label: "Production", active: false, submenu: ["Work Order", "Machine"], href: "#" },
     { icon: Package, label: "Inventory", active: false, href: "#" },
     { icon: ShoppingCart, label: "Sales", active: false, href: "#" },

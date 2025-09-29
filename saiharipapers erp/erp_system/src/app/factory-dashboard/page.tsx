@@ -32,7 +32,7 @@ export default function FactoryDashboard() {
 
   const sidebarItems = [
     { icon: BarChart3, label: "Dashboard", active: true, href: "/factory-dashboard" },
-    { icon: Users, label: "Staff & Vendor Management", active: false, href: "/staff-vendor-management" },
+    { icon: Users, label: "Attendance , Staff and Payroll management", active: false, href: "/staff-vendor-management" },
     { icon: Factory, label: "Production", active: false, submenu: ["Work Order", "Machine"], href: "#" },
     { icon: Package, label: "Inventory", active: false, href: "#" },
     { icon: ShoppingCart, label: "Sales", active: false, href: "#" },

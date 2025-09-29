@@ -27,35 +27,19 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error("Redirection failed:", err);
-      setError("Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50/30 to-purple-50/20">
-      {/* Dynamic background elements */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-gradient-to-r from-blue-400/20 to-indigo-400/20 blur-3xl animate-pulse" />
-        <div className="absolute top-1/3 -right-32 h-64 w-64 rounded-full bg-gradient-to-l from-purple-400/15 to-pink-400/15 blur-3xl animate-pulse delay-1000" />
-        <div className="absolute -bottom-32 left-1/4 h-96 w-96 rounded-full bg-gradient-to-t from-cyan-400/10 to-blue-400/10 blur-3xl animate-pulse delay-2000" />
-      </div>
-
-      {/* Floating particles */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 h-2 w-2 rounded-full bg-blue-400/40 animate-bounce delay-300" />
-        <div className="absolute top-3/4 right-1/3 h-1 w-1 rounded-full bg-indigo-400/50 animate-bounce delay-700" />
-        <div className="absolute top-1/2 left-3/4 h-1.5 w-1.5 rounded-full bg-purple-400/30 animate-bounce delay-1100" />
-      </div>
-
-
-
+    <div
+      className="relative min-h-screen w-full overflow-hidden"
+      style={{ backgroundImage: "url('/Background.jpg')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+    >
       {/* Main Login Card */}
       <main className="grid min-h-screen place-items-center px-4">
-        <div className={`w-full max-w-md transition-all duration-700 ease-out ${
-          isFormFocused ? 'scale-105' : 'scale-100'
-        }`}>
+        <div className={`w-full max-w-md transition-all duration-700 ease-out ${isFormFocused ? 'scale-105' : 'scale-100'}`}>
           <div className="relative">
             {/* Glow effect */}
             <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-blue-400/20 via-indigo-400/20 to-purple-400/20 blur-xl opacity-75 animate-pulse" />
