@@ -1261,6 +1261,23 @@ export default function EmployeeDetailsPage() {
                                 </select>
                               </div>
                               <div className="space-y-2">
+                                <Label htmlFor="increment_type">Increment Type</Label>
+                                <select
+                                  id="increment_type"
+                                  name="increment_type"
+                                  value={formData.increment_type || ''}
+                                  onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFormChange('increment_type', e.target.value)}
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <option value="">Select Increment Type</option>
+                                  <option value="increment_1">Increment 1</option>
+                                  <option value="increment_2">Increment 2</option>
+                                  <option value="increment_3">Increment 3</option>
+                                  <option value="increment_4">Increment 4</option>
+                                  <option value="increment_5">Increment 5</option>
+                                </select>
+                              </div>
+                              <div className="space-y-2">
                                 <Label htmlFor="bonus">Annual Bonus</Label>
                                 <Input
                                   id="bonus"
