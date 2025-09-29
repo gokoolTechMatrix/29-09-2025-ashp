@@ -54,6 +54,63 @@ import {
 } from "lucide-react";
 import { getEmployeeById, getEmployeeWithComputedFields, updateEmployeeDetails, updateUserInfo, getDepartments, calculateSalaryBreakdown, calculateAdvancedSalaryBreakdown, createSalaryStructure, getSalaryStructure, validateEmployeeCode } from "@/lib/supabase";
 
+interface FormData {
+  // Basic Info
+  full_name: string;
+  phone: string;
+  email: string;
+  employee_code: string;
+  
+  // Personal Details
+  gender: string;
+  date_of_birth: string;
+  nationality: string;
+  marital_status: string;
+  blood_group: string;
+  alternate_phone: string;
+  
+  // Address
+  current_address: string;
+  permanent_address: string;
+  
+  // Employment Details
+  department_id: string;
+  position_id: string;
+  employment_type: string;
+  contract_type: string;
+  join_date: string;
+  reel_unloading: string;
+  regular_packet: string;
+  reel_to_sheet_cutting_machine: string;
+  ruling_machine: string;
+  loadman_box_and_dispatch: string;
+  
+  // Education & Experience
+  education_qualification: string;
+  experience_years: number;
+  skills: string[];
+  certifications: string[];
+  
+  // Banking & Documents
+  bank_name: string;
+  bank_account_number: string;
+  ifsc_code: string;
+  pan_number: string;
+  aadhar_number: string;
+  
+  // Emergency Contact
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_address: string;
+  
+  // Salary and Increment
+  basic_salary: number;
+  hourly_rate: number;
+  salary_type: string;
+  increment_type: string;
+  bonus: number;
+}
+
 export default function EmployeeDetailsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<"P" | "A" | "L" | "">("P");
@@ -73,7 +130,7 @@ export default function EmployeeDetailsPage() {
   const [calculationMethod, setCalculationMethod] = useState<'monthly' | 'hourly'>('monthly');
   
   // Form state for editable fields
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     // Basic Info
     full_name: '',
     phone: '',
@@ -120,11 +177,13 @@ export default function EmployeeDetailsPage() {
     // Emergency Contact
     emergency_contact_name: '',
     emergency_contact_phone: '',
+    emergency_contact_address: '',
     
-    // Legacy fields for backward compatibility
+    // Salary and Increment
     basic_salary: 0,
     hourly_rate: 0,
     salary_type: '',
+    increment_type: '',
     bonus: 0
   });
   
@@ -320,6 +379,7 @@ export default function EmployeeDetailsPage() {
           ifsc_code: formData.ifsc_code,
           emergency_contact_name: formData.emergency_contact_name,
           emergency_contact_phone: formData.emergency_contact_phone,
+          emergency_contact_address: formData.emergency_contact_address,
           aadhar_number: formData.aadhar_number,
           pan_number: formData.pan_number
         };
@@ -436,11 +496,13 @@ export default function EmployeeDetailsPage() {
               // Emergency Contact
               emergency_contact_name: details.emergency_contact_name || '',
               emergency_contact_phone: details.emergency_contact_phone || '',
+              emergency_contact_address: details.emergency_contact_address || '',
               
-              // Legacy fields for backward compatibility
+              // Salary and Increment
               basic_salary: basicSalaryValue,
               hourly_rate: hourlyRateValue,
               salary_type: salaryTypeValue,
+              increment_type: details.increment_type || '',
               bonus: details.bonus || 0
             });
           }
@@ -1122,13 +1184,12 @@ export default function EmployeeDetailsPage() {
                                   onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('nationality', e.target.value)}
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
                                 />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="employeeCode" className="text-sm font-medium text-slate-700">Employee Code</Label>
+                              </div>                              <div className="space-y-2">
+                                <Label htmlFor="emergency_contact_address" className="text-sm font-medium text-slate-700">Emergency Contact Address</Label>
                                 <Input
-                                  id="employeeCode"
-                                  value={employeeData?.employee_details?.[0]?.employee_code || ''}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => handleFormChange('employee_code', e.target.value)}
+                                  id="emergency_contact_address"
+                                  value={formData.emergency_contact_address}
+                                  onChange={(e) => handleFormChange('emergency_contact_address', e.target.value)}
                                   className="bg-white/80 backdrop-blur-sm border-slate-200/50"
                                 />
                               </div>
@@ -2384,3 +2445,5 @@ export default function EmployeeDetailsPage() {
     </div>
   );
 }
+
+

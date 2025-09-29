@@ -31,11 +31,17 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
+ 
   return (
     <div
       className="relative min-h-screen w-full overflow-hidden"
-      style={{ backgroundImage: "url('/Background.jpg')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+      style={{
+        backgroundImage: "linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(99, 102, 241, 0.20) 40%, rgba(236, 72, 153, 0.18) 100%), url('/Background.jpg')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
     >
       {/* Main Login Card */}
       <main className="grid min-h-screen place-items-center px-4">

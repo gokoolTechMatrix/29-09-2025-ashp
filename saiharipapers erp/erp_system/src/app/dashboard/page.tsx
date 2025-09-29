@@ -129,7 +129,7 @@ export default function DashboardPage() {
                 <HandCoins className="h-6 w-6 text-white" />
               </div>
             </CardHeader>
-            <CardContent className="relative z-10">
+            <CardContent className="relative z-10"> this 
               <CardTitle className="text-slate-800 text-xl font-semibold mb-2">Financial Accounting</CardTitle>
               <CardDescription className="text-slate-600 leading-relaxed">Manage invoices, expenses, and ledgers</CardDescription>
             </CardContent>
